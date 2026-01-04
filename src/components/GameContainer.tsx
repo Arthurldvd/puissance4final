@@ -50,15 +50,6 @@ export const GameContainer = () => {
       }, 500);
       return () => clearTimeout(timer);
     }
-          if (success) {
-            setIsReady(true);
-          } else {
-            setTimeout(() => router.push('/'), 2000);
-          }
-        });
-      }, 500);
-      return () => clearTimeout(timer);
-    }
   }, [isConnected, name, room, shouldCreate]);
 
   if (!name) return null;
