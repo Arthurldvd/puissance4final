@@ -49,16 +49,22 @@ export const useSocket = () => {
         });
 
         socket.on('room_update', ({ players, gameState }) => {
-          console.log('📊 Room update:', players);
+          console.log('📊 Room update:', players, 'gameState:', gameState);
           if (mounted) {
             setPlayers(players);
-            if (gameState) setGameState(gameState);
+            if (gameState) {
+              setGameState(gameState);
+            }
           }
         });
 
         socket.on('game_state', (state: GameState) => {
-          console.log('🎮 Game state update');
+          console.log('🎮 Game state update:', state);
           if (mounted) setGameState(state);
+        });
+
+        socket.on('game_start', ({ message }) => {
+          console.log('🎮 Game start:', message);
         });
 
         socket.on('error', ({ message }) => {
@@ -77,11 +83,10 @@ export const useSocket = () => {
 
     return () => {
       mounted = false;
-      
     };
   }, []);
 
-  const createRoom = (callback: (code: string) => void) => {
+  const createRoom = (callback: (code: string, playerNum: number) => void) => {
     const socket = getSocket();
     if (!socket || !isConnected) {
       console.log('❌ Socket pas prêt, isConnected:', isConnected, 'socket:', !!socket);
@@ -92,7 +97,8 @@ export const useSocket = () => {
     socket.emit('create_room', (res: any) => {
       console.log('📥 Réponse create_room:', res);
       if (res?.success) {
-        callback(res.roomCode);
+        setPlayerNumber(res.playerNumber);
+        callback(res.roomCode, res.playerNumber);
       } else {
         console.error('❌ Erreur create_room:', res);
       }

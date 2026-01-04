@@ -21,36 +21,39 @@ export const GameContainer = () => {
 
   const { gameState, playerNumber, players, makeMove, resetGame, error, createRoom, joinRoom, leaveRoom, isConnected } = useSocket();
 
-  useEffect(() => {
-    if (shouldCreate) {
-      hasStarted.current = true;
-      const timer = setTimeout(() => {
-        createRoom((code) => {
-          setRoomCode(code);
-          joinRoom(code, name, (success) => {
-            if (success) {
-              setIsReady(true);
-              window.history.replaceState({}, '', `/game?room=${code}&name=${encodeURIComponent(name)}`);
-            }
-          });
-        });
-      }, 500);
-      return () => clearTimeout(timer);
-    } else if (room) {
-      hasStarted.current = true;
-      setRoomCode(room);
-      const timer = setTimeout(() => {
-        joinRoom(room, name, (success) => {
-          if (success) {
-            setIsReady(true);
-          } else {
-            setTimeout(() => router.push('/'), 2000);
-          }
-        });
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [isConnected, name, room, shouldCreate]);
+useEffect(() => {
+  if (!isConnected || hasStarted.current) return;
+
+  if (shouldCreate) {
+    hasStarted.current = true;
+    const timer = setTimeout(() => {
+      createRoom((code, playerNum) => {
+        console.log('✅ Room créée, je suis le joueur:', playerNum);
+        setRoomCode(code);
+        setIsReady(true);
+        window.history.replaceState({}, '', `/game?room=${code}&name=${encodeURIComponent(name)}`);
+      });
+    }, 500);
+    return () => clearTimeout(timer);
+  } else if (room) {
+    hasStarted.current = true;
+    setRoomCode(room); 
+    const timer = setTimeout(() => {
+      joinRoom(room, name, (success) => {
+        if (success) {
+          console.log('✅ Room rejointe:', room); 
+          setIsReady(true);
+        } else {
+          setTimeout(() => router.push('/'), 2000);
+        }
+      });
+    }, 500);
+    return () => clearTimeout(timer);
+  }
+}, [isConnected, name, room, shouldCreate]);
+
+
+
 
   if (!name) return null;
 

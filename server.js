@@ -29,7 +29,7 @@ if (!supabaseUrl || !supabaseServiceKey) {
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-console.log('Supabase configuré');
+console.log('✅ Supabase configuré');
 
 app.prepare().then(() => {
   const httpServer = createServer(async (req, res) => {
@@ -45,12 +45,18 @@ app.prepare().then(() => {
 
   const io = new Server(httpServer, {
     cors: {
-      origin: `http://${hostname}:${port}`,
+      origin: process.env.NODE_ENV === 'production' 
+        ? 'https://puissance4final-production.up.railway.app'
+        : `http://${hostname}:${port}`,
       methods: ['GET', 'POST']
     }
   });
 
   io.on('connection', async (socket) => {
+    socket.onAny((eventName, ...args) => {
+  console.log('📥 EVENT REÇU:', eventName, args);
+});
+
     const token = socket.handshake.auth.token;
     
     let user = null;
@@ -69,12 +75,13 @@ app.prepare().then(() => {
       return;
     }
 
-    console.log('Client connecté:', user.email);
+    console.log('✅ Client connecté:', user.email);
 
-    socket.on('create_room', (callback) => {
+    socket.on('create_room', async (callback) => {
       console.log('🎯 EVENT create_room REÇU');
       
       const roomCode = generateRoomCode();
+      const playerName = user.user_metadata?.display_name || user.email?.split('@')[0] || 'Joueur';
       
       rooms.set(roomCode, {
         game: new Connect4(),
@@ -84,8 +91,26 @@ app.prepare().then(() => {
         moveCount: 0
       });
 
-      console.log(`Salle créée: ${roomCode}`);
-      callback({ success: true, roomCode });
+      socket.join(roomCode);
+      
+      rooms.get(roomCode).players.push({
+        id: socket.id,
+        number: 1,
+        name: playerName,
+        userId: user.id
+      });
+
+      console.log(`✅ Salle créée: ${roomCode}, créateur: ${playerName}`);
+      
+      const currentGameState = rooms.get(roomCode).game.getState();
+      
+      socket.emit('player_assigned', { playerNumber: 1, playerName });
+      socket.emit('room_update', {
+        players: [{ number: 1, name: playerName }],
+        gameState: currentGameState
+      });
+      
+      callback({ success: true, roomCode, playerNumber: 1 });
     });
 
     socket.on('join_room', async ({ roomCode, playerName }, callback) => {
@@ -144,7 +169,7 @@ app.prepare().then(() => {
 
           if (!error && data) {
             room.gameId = data.id;
-            console.log(`Partie créée dans DB: ${data.id}`);
+            console.log(`✅ Partie créée dans DB: ${data.id}`);
           } else {
             console.error('❌ Erreur création partie:', error);
           }
@@ -153,6 +178,8 @@ app.prepare().then(() => {
         }
 
         io.to(roomCode).emit('game_start', { message: 'La partie commence !' });
+        
+        io.to(roomCode).emit('game_state', room.game.getState());
       }
 
       console.log(`${playerName} (${user.email}) a rejoint la salle ${roomCode}`);
@@ -160,9 +187,20 @@ app.prepare().then(() => {
 
     socket.on('make_move', async ({ roomCode, col }) => {
       const room = rooms.get(roomCode);
-      if (!room) return;
+      if (!room) {
+        console.log('❌ Room introuvable:', roomCode);
+        return;
+      }
 
       const player = room.players.find(p => p.id === socket.id);
+      
+      console.log('🎲 Make move:', {
+        roomCode,
+        col,
+        player: player?.number,
+        currentPlayer: room.game.currentPlayer
+      });
+      
       if (!player || player.number !== room.game.currentPlayer) {
         socket.emit('error', { message: 'Ce n\'est pas votre tour' });
         return;
@@ -172,7 +210,11 @@ app.prepare().then(() => {
       
       if (result.success) {
         room.moveCount++;
-        io.to(roomCode).emit('game_state', room.game.getState());
+        
+        const newGameState = room.game.getState();
+        console.log('✅ Move réussi, nouveau state:', newGameState);
+        
+        io.to(roomCode).emit('game_state', newGameState);
         
         if (room.game.winner) {
           const winnerPlayer = room.game.winner === 'draw' 
@@ -213,7 +255,7 @@ app.prepare().then(() => {
               if (error) {
                 console.error('❌ Erreur mise à jour partie:', error);
               } else {
-                console.log(`Partie terminée dans DB: ${room.gameId}`);
+                console.log(`✅ Partie terminée dans DB: ${room.gameId}`);
                 
                 const { data: checkData } = await supabase
                   .from('games')
@@ -221,7 +263,7 @@ app.prepare().then(() => {
                   .eq('id', room.gameId)
                   .single();
                 
-                console.log('Données enregistrées:', checkData);
+                console.log('📊 Données enregistrées:', checkData);
               }
             } catch (err) {
               console.error('❌ Erreur DB:', err);
@@ -231,6 +273,7 @@ app.prepare().then(() => {
           }
         }
       } else {
+        console.log('❌ Move échoué:', result);
         socket.emit('error', result);
       }
     });
@@ -259,7 +302,7 @@ app.prepare().then(() => {
 
             if (!error && data) {
               room.gameId = data.id;
-              console.log(`Nouvelle partie créée dans DB: ${data.id}`);
+              console.log(`📊 Nouvelle partie créée dans DB: ${data.id}`);
             }
           } catch (err) {
             console.error('❌ Erreur DB:', err);
@@ -310,7 +353,7 @@ app.prepare().then(() => {
       process.exit(1);
     })
     .listen(port, () => {
-      console.log(`Ready on http://${hostname}:${port}`);
+      console.log(`> Ready on http://${hostname}:${port}`);
     });
 });
 

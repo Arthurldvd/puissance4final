@@ -7,6 +7,10 @@ let socket: Socket | null = null;
 let isInitialized = false;
 let initPromise: Promise<Socket> | null = null;
 
+const SOCKET_URL = process.env.NODE_ENV === 'production'
+  ? 'https://puissance4final-production.up.railway.app'
+  : 'http://localhost:3000';
+
 export async function initSocket() {
   
   if (initPromise) {
@@ -19,7 +23,7 @@ export async function initSocket() {
     return socket;
   }
 
-  console.log('🔌 Initialisation socket...');
+  console.log('🔌 Initialisation socket...', SOCKET_URL);
   
   initPromise = (async () => {
     const supabase = createClient();
@@ -29,14 +33,13 @@ export async function initSocket() {
       throw new Error('Pas de session');
     }
 
-  
     if (socket) {
       console.log('🔌 Déconnexion ancien socket');
       socket.removeAllListeners();
       socket.disconnect();
     }
 
-    socket = io({
+    socket = io(SOCKET_URL, {
       auth: { token: data.session.access_token },
       reconnection: true,
       reconnectionAttempts: 5,

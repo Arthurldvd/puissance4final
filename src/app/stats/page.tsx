@@ -50,7 +50,6 @@ export default function StatsPage() {
 
       setUserName(user.user_metadata.display_name || user.email?.split('@')[0] || 'Joueur');
 
-      // Récupérer toutes les parties du joueur (sans JOIN)
       const { data: games, error } = await supabase
         .from('games')
         .select('*')
@@ -87,7 +86,6 @@ export default function StatsPage() {
         return;
       }
 
-      // Calculer les stats
       let wins = 0;
       let losses = 0;
       let draws = 0;
@@ -109,7 +107,6 @@ export default function StatsPage() {
           totalMoves += Math.ceil((game.total_moves || 0) / 2);
           opponents.add(game.player2_id);
           
-          // Head to head
           const opponentId = game.player2_id;
           const opponentName = game.player2_name || `Adversaire ${opponentStats.size + 1}`;
           
@@ -148,7 +145,6 @@ export default function StatsPage() {
           totalMoves += Math.floor((game.total_moves || 0) / 2);
           opponents.add(game.player1_id);
           
-          // Head to head
           const opponentId = game.player1_id;
           const opponentName = game.player1_name || `Adversaire ${opponentStats.size + 1}`;
           
